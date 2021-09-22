@@ -1,61 +1,45 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.2;
-
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 
-contract NFM is ERC721, ERC721URIStorage, Pausable, Ownable {
-    using Counters for Counters.Counter;
+contract NFM is ERC1155, Ownable {
+    constructor(string memory uri) ERC1155(uri) {}
 
-    Counters.Counter private _tokenIdCounter;
-    string private _currentTokenUri = "";
+    mapping(uint256 => bool) public openMints;
 
-    constructor(string memory tokenUri) ERC721("NFM", "NFM") {
-        _currentTokenUri = tokenUri;
+    function setURI(string memory newuri) public onlyOwner {
+        _setURI(newuri);
     }
 
-    function pause() public onlyOwner {
-        _pause();
+    function safeMint(uint256 id, bytes memory data) public {
+        require(openMints[id] == true, "Unauthorized Mint");
+        require(balanceOf(msg.sender, id) < 1, "You already have one");
+        _mint(msg.sender, id, 1, data);
     }
 
-    function unpause() public onlyOwner {
-        _unpause();
+    function openMint(uint256 id) public onlyOwner {
+        openMints[id] = true;
     }
 
-    function setCurrentTokenUri(string memory tokenUri) public onlyOwner {
-        _currentTokenUri = tokenUri;
+    function closeMint(uint256 id) public onlyOwner {
+        openMints[id] = false;
     }
 
-    function safeMint() public whenNotPaused {
-        uint id = _tokenIdCounter.current();
-        _safeMint(msg.sender, id);
-        _setTokenURI(id, _currentTokenUri);
-        _tokenIdCounter.increment();
-    }
-
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId)
-        internal
-        whenNotPaused
-        override
-    {
-        super._beforeTokenTransfer(from, to, tokenId);
-    }
-
-    // The following functions are overrides required by Solidity.
-
-    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
-        super._burn(tokenId);
-    }
-
-    function tokenURI(uint256 tokenId)
+    function mint(address account, uint256 id, uint256 amount, bytes memory data)
         public
-        view
-        override(ERC721, ERC721URIStorage)
-        returns (string memory)
+        onlyOwner
     {
-        return super.tokenURI(tokenId);
+        _mint(account, id, amount, data);
+    }
+
+    function mintBatch(address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
+        public
+        onlyOwner
+    {
+        _mintBatch(to, ids, amounts, data);
+    }
+
+    function withdrawEther(address payable _to, uint256 _amount) public onlyOwner
+    {
+        _to.transfer(_amount);
     }
 }
